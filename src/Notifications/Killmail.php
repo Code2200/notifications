@@ -89,8 +89,56 @@ class Killmail extends AbstractNotification
                 'https://zkillboard.com/kill/' . $this->killmail->killmail_id . '/'
             );
     }
-    
-    private function getNotificationString(): string
+
+    /**
+     * Get the Slack representation of the notification.
+     *
+     * @param $notifiable
+     *
+     * @return SlackMessage
+     */
+    public function toSlack($notifiable)
+    {
+
+        $icon_url = sprintf('https:%s',
+            (new Eve('type', $this->killmail->killmail_victim->ship_type_id, 64, [], false))->url(64));
+
+        $message = (new SlackMessage)
+            ->content('Reactor Breach Detected!')
+            ->from('Defense Mainframe', $icon_url)
+            ->attachment(function ($attachment) use ($icon_url) {
+
+                $attachment
+                    ->timestamp(carbon($this->killmail->killmail_time))
+                    ->fields([
+                        'Ship Type' => $this->killmail->killmail_victim->ship_type->typeName,
+                        'zKB Link'  => 'https://zkillboard.com/kill/' . $this->killmail->killmail_id,
+                        'Value'     => $this->getValue($this->killmail_detail->killmail_id,
+                        'Involved Pilots' => $this->getNumberOfAttackers(),
+                    ])
+                    ->field(function ($field) {
+
+                        $field->title('System')
+                            ->content($this->zKillBoardToSlackLink(
+                                'system',
+                                $this->killmail->killmail_detail->solar_system_id,
+                                $this->killmail->killmail_detail->solar_system->itemName . ' (' .
+                                number_format($this->killmail->security, 2) . ')'));
+                    })
+                    ->thumb($icon_url)
+                    ->fallback('Kill details')
+                    ->footer('zKillboard')
+                    ->footerIcon('https://zkillboard.com/img/wreck.png')
+                    ->color($this->is_loss($notifiable) ? self::LOSS_COLOR : self::KILL_COLOR);
+            });
+
+        ($this->killmail->corporation_id === $this->killmail->killmail_victim->corporation_id) ?
+            $message->error() : $message->success();
+
+        return $message;
+    }
+
+     private function getNotificationString(): string
     {
         
         return sprintf('%s just killed %s %s',
@@ -146,56 +194,7 @@ class Killmail extends AbstractNotification
             );
         return '';
     }
-    
-
-    /**
-     * Get the Slack representation of the notification.
-     *
-     * @param $notifiable
-     *
-     * @return SlackMessage
-     */
-    public function toSlack($notifiable)
-    {
-
-        $icon_url = sprintf('https:%s',
-            (new Eve('type', $this->killmail->killmail_victim->ship_type_id, 64, [], false))->url(64));
-
-        $message = (new SlackMessage)
-            ->content('A kill has been recorded for your corporation!')
-            ->from('SeAT Killmails', $icon_url)
-            ->attachment(function ($attachment) use ($icon_url) {
-
-                $attachment
-                    ->timestamp(carbon($this->killmail->killmail_time))
-                    ->fields([
-                        'Ship Type' => $this->killmail->killmail_victim->ship_type->typeName,
-                        'zKB Link'  => 'https://zkillboard.com/kill/' . $this->killmail->killmail_id,
-                        'Value'     => $this->getValue($this->killmail_detail->killmail_id,
-                        'Involved Pilots' => $this->getNumberOfAttackers(),
-                    ])
-                    ->field(function ($field) {
-
-                        $field->title('System')
-                            ->content($this->zKillBoardToSlackLink(
-                                'system',
-                                $this->killmail->killmail_detail->solar_system_id,
-                                $this->killmail->killmail_detail->solar_system->itemName . ' (' .
-                                number_format($this->killmail->security, 2) . ')'));
-                    })
-                    ->thumb($icon_url)
-                    ->fallback('Kill details')
-                    ->footer('zKillboard')
-                    ->footerIcon('https://zkillboard.com/img/wreck.png')
-                    ->color($this->is_loss($notifiable) ? self::LOSS_COLOR : self::KILL_COLOR);
-            });
-
-        ($this->killmail->corporation_id === $this->killmail->killmail_victim->corporation_id) ?
-            $message->error() : $message->success();
-
-        return $message;
-    }
-
+                        
     /**
      * Get the array representation of the notification.
      *
