@@ -113,7 +113,7 @@ class Killmail extends AbstractNotification
                     ->fields([
                         'Ship Type' => $this->killmail->killmail_victim->ship_type->typeName,
                         'zKB Link'  => 'https://zkillboard.com/kill/' . $this->killmail->killmail_id,
-                        'Value'     => $this->getValue($this->killmail_detail->killmail_id,
+                        'Value'     => $this->getValue($this->killmail_detail->killmail_id),
                         'Involved Pilots' => $this->getNumberOfAttackers(),
                     ])
                     ->field(function ($field) {
