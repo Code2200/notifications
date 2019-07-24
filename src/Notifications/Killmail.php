@@ -32,7 +32,7 @@ use Seat\Services\Image\Eve;
  */
 class Killmail extends AbstractNotification
 {
-    const LOSS_COLOR = '#DD4B39':
+    const LOSS_COLOR = '#DD4B39';
     const KILL_COLOR = '00A65A';
     /**
      * @var
