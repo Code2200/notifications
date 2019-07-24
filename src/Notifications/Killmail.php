@@ -32,6 +32,8 @@ use Seat\Services\Image\Eve;
  */
 class Killmail extends AbstractNotification
 {
+    const LOSS_COLOR = '#DD4B39':
+    const KILL_COLOR = '00A65A';
     /**
      * @var
      */
@@ -87,6 +89,64 @@ class Killmail extends AbstractNotification
                 'https://zkillboard.com/kill/' . $this->killmail->killmail_id . '/'
             );
     }
+    
+    private function getNotificationString(): string
+    {
+        
+        return sprintf('%s just killed %s %s',
+            $this->getAttacker(),
+            $this->getVictim(),
+            $this->getNumberofAttackers() == 1 ? 'solo.' : ''
+        );
+    }
+    
+    private function getAttacker(): string
+    {
+        $killmail_attacker = $this->killmail_detail
+            ->attackers
+            ->where('final_blow', 1)
+            ->first();
+        return $this->getSlackKMStringPartial(
+            $killmail_attacker->character_id,
+            $killmail_attacker->corporation_id,
+            $killmail_attacker->ship_type_id,
+            $killmail_attacker->alliance_id
+        );
+    }
+     
+    private function getVictim(): string
+    {
+        $killmail_victim = $this->killmail_detail->victims;
+        return $this->getSlackKMStringPartial(
+            $killmail_victim->character_id,
+            $killmail_victim->corporation_id,
+            $killmail_victim->ship_type_id,
+            $killmail_victim->alliance_id
+        );
+    }
+     
+        private function getSlackKMStringPartial($character_id, $corporation_id, $ship_type_id, $alliance_id): string
+    {
+        $character = is_null($character_id) ? null : $this->resolveID($character_id);
+        $corporation = is_null($corporation_id) ? null : $this->resolveID($corporation_id);
+        $alliance = is_null($alliance_id) ? null : strtoupper('<' . $this->resolveID($alliance_id, true) . '>');
+        $ship_type = optional(InvType::find($ship_type_id))->typeName;
+        if (is_null($character_id))
+            return sprintf('*%s* [%s] %s)',
+                $ship_type,
+                $corporation,
+                $alliance
+            );
+        if (! is_null($character_id))
+            return sprintf('*%s* [%s] %s flying a *%s*',
+                $character,
+                $corporation,
+                $alliance,
+                $ship_type
+            );
+        return '';
+    }
+    
 
     /**
      * Get the Slack representation of the notification.
@@ -111,6 +171,8 @@ class Killmail extends AbstractNotification
                     ->fields([
                         'Ship Type' => $this->killmail->killmail_victim->ship_type->typeName,
                         'zKB Link'  => 'https://zkillboard.com/kill/' . $this->killmail->killmail_id,
+                        'Value'     => $this->getValue($this->killmail_detail->killmail_id,
+                        'Involved Pilots' => $this->getNumberOfAttackers(),
                     ])
                     ->field(function ($field) {
 
@@ -124,7 +186,8 @@ class Killmail extends AbstractNotification
                     ->thumb($icon_url)
                     ->fallback('Kill details')
                     ->footer('zKillboard')
-                    ->footerIcon('https://zkillboard.com/img/wreck.png');
+                    ->footerIcon('https://zkillboard.com/img/wreck.png')
+                    ->color($this->is_loss($notifiable) ? self::LOSS_COLOR : self::KILL_COLOR);
             });
 
         ($this->killmail->corporation_id === $this->killmail->killmail_victim->corporation_id) ?
